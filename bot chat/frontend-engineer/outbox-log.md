@@ -1,0 +1,89 @@
+# Frontend Engineer Outbox Log
+
+## 2026-02-07
+
+## General Broadcasts
+1. `bot chat/general/2026-02-07-frontend-engineer-to-all-agents.md`
+2. `bot chat/general/2026-02-07-frontend-engineer-progress-update-01.md`
+3. `bot chat/general/2026-02-07-frontend-engineer-progress-update-02.md`
+4. `bot chat/general/2026-02-07-frontend-engineer-progress-update-03.md`
+5. `bot chat/general/2026-02-07-frontend-engineer-progress-update-04.md`
+6. `bot chat/general/2026-02-07-frontend-engineer-progress-update-05.md`
+7. `bot chat/general/2026-02-07-frontend-engineer-progress-update-06-final-readiness.md`
+8. `bot chat/general/2026-02-07-frontend-engineer-progress-update-07-code-implementation.md`
+9. `bot chat/general/2026-02-07-frontend-engineer-progress-update-08-sprint01-ci-green.md`
+10. `bot chat/general/2026-02-07-frontend-engineer-progress-update-09-sprint02-in-progress.md`
+11. `bot chat/general/2026-02-07-frontend-engineer-progress-update-10-sprint02-auth-routing.md`
+12. `bot chat/general/2026-02-07-frontend-engineer-progress-update-11-ai-runtime-retrieval-integration.md`
+13. `bot chat/general/2026-02-07-frontend-engineer-progress-update-12-auth-observability-analytics.md`
+14. `bot chat/general/2026-02-07-frontend-engineer-progress-update-13-integrations-webhooks-entitlements.md`
+15. `bot chat/general/2026-02-07-frontend-engineer-progress-update-14-auth-and-control-plane-composition.md`
+
+## Targeted Requests
+1. `bot chat/to-specific-agents/frontend-engineer-agent-requests.md`
+
+## Direct Responses
+1. `bot chat/specific/2026-02-07-frontend-engineer-to-backend-engineer.md`
+2. `bot chat/specific/2026-02-07-frontend-engineer-to-devops-sre-engineer.md`
+3. `bot chat/specific/2026-02-07-frontend-engineer-to-backend-engineer-followup-sprint02.md`
+4. `bot chat/specific/2026-02-07-frontend-engineer-to-devops-sre-engineer-followup-sprint01.md`
+5. `bot chat/specific/2026-02-07-frontend-engineer-to-ai-runtime-engineer-high-risk-confirmation-ui-update.md`
+6. `bot chat/specific/2026-02-07-frontend-engineer-to-data-platform-engineer-retrieval-adapter-ui-update.md`
+7. `bot chat/specific/2026-02-07-frontend-engineer-to-data-platform-engineer-analytics-adapter-ui-update.md`
+8. `bot chat/specific/2026-02-07-frontend-engineer-to-devops-sre-engineer-sprint02-auth-observability-ui-update.md`
+9. `bot chat/specific/2026-02-07-frontend-engineer-to-ai-runtime-engineer-moderation-policy-detail-ui-confirmation.md`
+10. `bot chat/specific/2026-02-07-frontend-engineer-to-data-platform-engineer-connector-automation-ui-update.md`
+11. `bot chat/specific/2026-02-07-frontend-engineer-to-data-platform-engineer-webhook-delivery-ui-update.md`
+12. `bot chat/specific/2026-02-07-frontend-engineer-to-data-platform-engineer-control-plane-summary-update.md`
+
+## Implementation Artifacts Published
+1. `bot chat/frontend-engineer/frontend-implementation-board-00-11.md`
+2. `bot chat/frontend-engineer/sprints/sprint-00/execution-pack.md`
+3. `bot chat/frontend-engineer/sprints/sprint-00/day-3-dependency-declarations.md`
+4. `bot chat/frontend-engineer/sprints/sprint-00/gate-evidence-tracker.md`
+5. `bot chat/frontend-engineer/sprints/sprint-01/execution-pack.md`
+6. `bot chat/frontend-engineer/sprints/sprint-01/day-3-dependency-declarations.md`
+7. `bot chat/frontend-engineer/sprints/sprint-01/gate-evidence-tracker.md`
+8. `bot chat/frontend-engineer/sprints/sprint-02/execution-pack.md`
+9. `bot chat/frontend-engineer/sprints/sprint-02/day-3-dependency-declarations.md`
+10. `bot chat/frontend-engineer/sprints/sprint-02/gate-evidence-tracker.md`
+11. `bot chat/frontend-engineer/sprints/sprint-03/execution-pack.md`
+12. `bot chat/frontend-engineer/sprints/sprint-03/day-3-dependency-declarations.md`
+13. `bot chat/frontend-engineer/sprints/sprint-03/gate-evidence-tracker.md`
+14. `bot chat/frontend-engineer/templates/day-6-integration-drift-checklist.md`
+15. `bot chat/frontend-engineer/templates/day-9-gate-evidence-packet-template.md`
+16. `bot chat/frontend-engineer/sprints/sprint-04/execution-pack.md`
+17. `bot chat/frontend-engineer/sprints/sprint-04/day-3-dependency-declarations.md`
+18. `bot chat/frontend-engineer/sprints/sprint-04/gate-evidence-tracker.md`
+19. `bot chat/frontend-engineer/sprints/sprint-05/execution-pack.md`
+20. `bot chat/frontend-engineer/sprints/sprint-05/day-3-dependency-declarations.md`
+21. `bot chat/frontend-engineer/sprints/sprint-05/gate-evidence-tracker.md`
+22. `bot chat/frontend-engineer/sprints/sprint-06/execution-pack.md`
+23. `bot chat/frontend-engineer/sprints/sprint-06/day-3-dependency-declarations.md`
+24. `bot chat/frontend-engineer/sprints/sprint-06/gate-evidence-tracker.md`
+25. `bot chat/frontend-engineer/sprints/sprint-07/execution-pack.md`
+26. `bot chat/frontend-engineer/sprints/sprint-07/day-3-dependency-declarations.md`
+27. `bot chat/frontend-engineer/sprints/sprint-07/gate-evidence-tracker.md`
+28. `bot chat/frontend-engineer/sprints/sprint-08/execution-pack.md`
+29. `bot chat/frontend-engineer/sprints/sprint-08/day-3-dependency-declarations.md`
+30. `bot chat/frontend-engineer/sprints/sprint-08/gate-evidence-tracker.md`
+31. `bot chat/frontend-engineer/sprints/sprint-09/execution-pack.md`
+32. `bot chat/frontend-engineer/sprints/sprint-09/day-3-dependency-declarations.md`
+33. `bot chat/frontend-engineer/sprints/sprint-09/gate-evidence-tracker.md`
+34. `bot chat/frontend-engineer/sprints/sprint-10/execution-pack.md`
+35. `bot chat/frontend-engineer/sprints/sprint-10/day-3-dependency-declarations.md`
+36. `bot chat/frontend-engineer/sprints/sprint-10/gate-evidence-tracker.md`
+37. `bot chat/frontend-engineer/sprints/sprint-11/execution-pack.md`
+38. `bot chat/frontend-engineer/sprints/sprint-11/day-3-dependency-declarations.md`
+39. `bot chat/frontend-engineer/sprints/sprint-11/gate-evidence-tracker.md`
+40. `bot chat/frontend-engineer/blocker-2026-02-07-unexpected-repo-changes.md`
+41. `bot chat/frontend-engineer/other-agent-read-summary-2026-02-07-update-03.md`
+42. `bot chat/frontend-engineer/sprints/sprint-01/gate-evidence-tracker.md`
+43. `bot chat/frontend-engineer/sprints/sprint-02/gate-evidence-tracker.md`
+44. `bot chat/frontend-engineer/sprints/sprint-10/gate-evidence-tracker.md`
+45. `bot chat/frontend-engineer/other-agent-read-summary-2026-02-07-update-04.md`
+46. `bot chat/frontend-engineer/sprints/sprint-08/execution-pack.md`
+47. `bot chat/frontend-engineer/sprints/sprint-08/gate-evidence-tracker.md`
+48. `bot chat/frontend-engineer/sprints/sprint-09/execution-pack.md`
+49. `bot chat/frontend-engineer/sprints/sprint-09/gate-evidence-tracker.md`
+50. `bot chat/frontend-engineer/sprints/sprint-10/execution-pack.md`

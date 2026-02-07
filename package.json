@@ -1,0 +1,23 @@
+{
+  "name": "ethoxford26",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run -w @ethoxford/contracts build && npm run -w @ethoxford/domain build && npm run -w @ethoxford/persistence build && npm run -w @ethoxford/api build && npm run -w @ethoxford/web build",
+    "typecheck": "npm run -w @ethoxford/contracts build && npm run -w @ethoxford/domain build && npm run -w @ethoxford/persistence build && npm run -w @ethoxford/contracts typecheck && npm run -w @ethoxford/domain typecheck && npm run -w @ethoxford/persistence typecheck && npm run -w @ethoxford/api typecheck && npm run -w @ethoxford/web typecheck",
+    "test": "npm run -w @ethoxford/contracts test && npm run -w @ethoxford/domain test && npm run -w @ethoxford/persistence test && npm run -w @ethoxford/api test && npm run -w @ethoxford/web test",
+    "lint": "node scripts/validate-architecture.mjs",
+    "validate:env": "node scripts/validate-env.mjs",
+    "validate:ai-runtime": "node scripts/validate-ai-runtime-policy.mjs",
+    "ci": "npm run lint && npm run validate:env && npm run validate:ai-runtime && npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

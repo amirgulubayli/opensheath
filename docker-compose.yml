@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.7.4-pg16
+    container_name: ethoxford-postgres
+    environment:
+      POSTGRES_USER: ethoxford
+      POSTGRES_PASSWORD: ethoxford
+      POSTGRES_DB: ethoxford
+    ports:
+      - "5432:5432"
+    volumes:
+      - ethoxford_pgdata:/var/lib/postgresql/data
+
+volumes:
+  ethoxford_pgdata:

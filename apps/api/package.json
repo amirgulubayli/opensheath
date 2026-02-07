@@ -1,0 +1,21 @@
+{
+  "name": "@ethoxford/api",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "dependencies": {
+    "@ethoxford/contracts": "0.1.0",
+    "@ethoxford/domain": "0.1.0",
+    "@ethoxford/persistence": "0.1.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "npm run -w @ethoxford/contracts build && npm run -w @ethoxford/domain build",
+    "test": "tsx --test src/**/*.test.ts",
+    "lint": "echo api lint handled at root",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts"
+  }
+}
