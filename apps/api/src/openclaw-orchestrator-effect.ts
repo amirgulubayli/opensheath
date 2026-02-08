@@ -52,7 +52,7 @@ export class EffectfulOpenClawOrchestrator implements OrchestratorEngine {
   ): Effect.Effect<OrchestratorResult> {
     return Effect.gen(function* (_) {
       const planId = `plan_${randomUUID()}`;
-      const plan = yield* _(buildPlan(planId, message, relayOpts, toolInvoke, this.config, this.llm));
+      const plan = yield* _(buildPlan(planId, message, this.config, this.llm));
       const start = yield* _(Clock.currentTimeMillis);
 
       const executed = yield* _(
@@ -92,8 +92,6 @@ export class EffectfulOpenClawOrchestrator implements OrchestratorEngine {
 function buildPlan(
   planId: string,
   message: string,
-  relayOpts: ChatRelayOptions,
-  toolInvoke: ToolInvokeFunction | undefined,
   config: OrchestratorConfig,
   llm?: OrchestratorLlm | null,
 ): Effect.Effect<OrchestratorPlan> {

@@ -73,6 +73,36 @@ const PROVIDER_PRESETS = [
   { value: "custom", label: "Custom…", icon: "⚙️" },
 ];
 
+const DEMO_CONNECTIONS = [
+  {
+    id: "google-workspace",
+    name: "Google Workspace",
+    icon: "🟢",
+    status: "connected",
+    note: "Calendar + Gmail + Drive",
+    lastSync: "just now",
+    scopes: ["Calendar", "Gmail", "Drive"],
+  },
+  {
+    id: "twitter",
+    name: "Twitter",
+    icon: "🐦",
+    status: "connected",
+    note: "Brand monitoring + outreach",
+    lastSync: "2m ago",
+    scopes: ["Search", "DMs", "Mentions"],
+  },
+  {
+    id: "trello",
+    name: "Trello",
+    icon: "🧩",
+    status: "connected",
+    note: "Workflow tasks + approvals",
+    lastSync: "5m ago",
+    scopes: ["Boards", "Cards", "Members"],
+  },
+];
+
 function StatusBadge({ status }: { status: string }) {
   const color =
     status === "connected" || status === "healthy"
@@ -424,6 +454,38 @@ export default function IntegrationsPage() {
       {/* ═══════════════ CONNECTORS TAB ═══════════════ */}
       {tab === "connectors" && (
         <div className="tab-content">
+          <div className="demo-conn-section">
+            <div className="demo-conn-header">
+              <div>
+                <h3 className="demo-conn-title">🔗 Demo Connections</h3>
+                <span className="demo-conn-subtitle">Hardcoded for demo — Google Workspace, Twitter, Trello</span>
+              </div>
+              <span className="demo-conn-badge">CONNECTED</span>
+            </div>
+            <div className="demo-conn-grid">
+              {DEMO_CONNECTIONS.map((conn) => (
+                <div key={conn.id} className="demo-conn-card">
+                  <div className="demo-conn-card-header">
+                    <span className="demo-conn-icon">{conn.icon}</span>
+                    <div>
+                      <div className="demo-conn-name">{conn.name}</div>
+                      <div className="demo-conn-note">{conn.note}</div>
+                    </div>
+                    <span className={`demo-conn-status ${conn.status}`}>{conn.status}</span>
+                  </div>
+                  <div className="demo-conn-scopes">
+                    {conn.scopes.map((scope) => (
+                      <span key={scope} className="demo-conn-scope">{scope}</span>
+                    ))}
+                  </div>
+                  <div className="demo-conn-footer">
+                    <span>Last sync: {conn.lastSync}</span>
+                    <span className="demo-conn-pill">Secure</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           {/* ── Auto-discovered OpenClaw Capabilities ── */}
           {(capabilities.length > 0 || capabilitiesLoading) && (
             <div className="discovered-section">
@@ -832,6 +894,106 @@ export default function IntegrationsPage() {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
           gap: 16px;
+        }
+        .demo-conn-section {
+          background: #13142a;
+          border: 1px solid #2a2d42;
+          border-radius: 12px;
+          padding: 20px;
+          margin-bottom: 24px;
+        }
+        .demo-conn-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 14px;
+        }
+        .demo-conn-title {
+          font-size: 1rem;
+          font-weight: 700;
+          margin: 0 0 4px;
+          color: #e0e2ee;
+        }
+        .demo-conn-subtitle {
+          font-size: 0.78rem;
+          color: #8b8fa3;
+        }
+        .demo-conn-badge {
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-size: 0.7rem;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          background: #22c55e1c;
+          color: #22c55e;
+        }
+        .demo-conn-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+          gap: 12px;
+        }
+        .demo-conn-card {
+          background: #1a1c2e;
+          border: 1px solid #2a2d42;
+          border-radius: 12px;
+          padding: 14px;
+          transition: transform 0.15s ease, border-color 0.2s ease;
+        }
+        .demo-conn-card:hover {
+          border-color: #3b4eff66;
+          transform: translateY(-2px);
+        }
+        .demo-conn-card-header {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
+        .demo-conn-icon {
+          font-size: 1.4rem;
+        }
+        .demo-conn-name {
+          font-weight: 600;
+          font-size: 0.95rem;
+          color: #e0e2ee;
+        }
+        .demo-conn-note {
+          font-size: 0.75rem;
+          color: #8b8fa3;
+        }
+        .demo-conn-status {
+          margin-left: auto;
+          font-size: 0.7rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: #22c55e;
+        }
+        .demo-conn-scopes {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-bottom: 12px;
+        }
+        .demo-conn-scope {
+          padding: 3px 8px;
+          border-radius: 999px;
+          font-size: 0.7rem;
+          background: #3b4eff12;
+          color: #8da2ff;
+        }
+        .demo-conn-footer {
+          display: flex;
+          justify-content: space-between;
+          font-size: 0.72rem;
+          color: #8b8fa3;
+        }
+        .demo-conn-pill {
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: #22c55e12;
+          color: #22c55e;
+          font-weight: 600;
         }
         .connector-card {
           background: #1a1c2e;

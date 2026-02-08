@@ -46,6 +46,29 @@ ClosedSheath is the governance.
 
 One natural-language request. The orchestrator grounds itself in your knowledge base, spawns parallel sub-agents, proposes tool actions, hits ClosedSheath's review gate for anything risky, routes through OpenClaw, and records every decision in an immutable trace — all visible in a single dashboard.
 
+## How to Run
+
+### Prereqs
+- Node.js 20+
+- npm 9+
+
+### Install
+1. `npm ci`
+
+### Run the API
+1. `npm run -w @ethoxford/api dev`
+
+### Run the Web App (optional)
+1. `npm run -w @ethoxford/web dev`
+
+### Environment
+- `.env` in the repo root is optional.
+- `OPENAI_API_KEY` enables LLM-powered decomposition + synthesis in the task orchestrator.
+
+## Effectful Architecture (Bounty)
+
+This repo ships an effectful core for the OpenClaw task pipeline. See EFFECTS.md for the full effect inventory, effect definitions, and runtime wiring.
+
 ## Core Security Controls
 
 - Two-layer allowlisting (middleware + OpenClaw policy chain)

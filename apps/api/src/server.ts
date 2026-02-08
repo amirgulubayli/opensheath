@@ -690,7 +690,6 @@ function createOpenClawDependencies(): OpenClawDependencies {
   let orchestratorLlm: import("./openclaw-orchestrator.js").OrchestratorLlm | undefined;
   if (openAiKey) {
     try {
-      const { default: OpenAI } = await import("openai");
       const client = new OpenAI({ apiKey: openAiKey });
       orchestratorLlm = new OpenAiOrchestratorLlm(client, openAiModel);
       console.log(`[openclaw] Orchestrator LLM enabled (model=${openAiModel ?? "gpt-4.1-mini"})`);

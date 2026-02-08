@@ -15,19 +15,12 @@
 import { randomUUID } from "node:crypto";
 
 import { relayChatMessage, type ChatRelayOptions } from "./openclaw-chat-relay.js";
-import { executeDecomposedTask } from "./openclaw-task-decomposer.js";
 import {
-  type OrchestratorEngine,
+  OpenClawOrchestrator,
   type OrchestratorLlm,
   type ToolInvokeFunction,
   type OrchestratorConfig,
 } from "./openclaw-orchestrator.js";
-import { EffectfulOpenClawOrchestrator } from "./openclaw-orchestrator-effect.js";
-import {
-  invokeToolEffect,
-  runOpenClawEffect,
-  selectGatewayEffect,
-} from "./effects/openclaw-effects.js";
 
 // ─── Capability Discovery Cache ────────────────────────────────
 interface DiscoveredCapability {
@@ -81,7 +74,7 @@ export interface OpenClawDependencies {
   /** Options for the WebSocket chat relay to the OpenClaw agent. */
   chatRelayOpts?: ChatRelayOptions;
   /** Orchestrator engine for intelligent task decomposition & execution */
-  orchestrator?: OrchestratorEngine;
+  orchestrator?: OpenClawOrchestrator;
   /** LLM for decomposition and synthesis (injected from server config) */
   orchestratorLlm?: OrchestratorLlm;
   /** Orchestrator config overrides */
@@ -275,10 +268,7 @@ export async function handleOpenClawRequest(
       if (optionalString(input, "swarmRunId")) invokeOpts.swarmRunId = optionalString(input, "swarmRunId")!;
       if (optionalString(input, "agentRunId")) invokeOpts.agentRunId = optionalString(input, "agentRunId")!;
       if (optionalBoolean(input, "confirmHighRisk") !== undefined) invokeOpts.confirmHighRisk = optionalBoolean(input, "confirmHighRisk");
-      const result = await runOpenClawEffect(
-        { gatewayRegistry: deps.gatewayRegistry, middlewareChain: deps.middlewareChain },
-        invokeToolEffect(context, invokeRequest, invokeOpts),
-      );
+      const result = await deps.middlewareChain.execute(context, invokeRequest, invokeOpts);
 
       if (result.blocked) {
         return { statusCode: 403, payload: apiError(context.correlationId, "policy_denied", result.reason, { invocationId: result.envelope.invocationId }) };
@@ -332,15 +322,10 @@ export async function handleOpenClawRequest(
       const message = requireString(input, "message");
       const sessionKey = optionalString(input, "sessionKey");
 
-      let gw;
-      try {
-        gw = await runOpenClawEffect(
-          { gatewayRegistry: deps.gatewayRegistry, middlewareChain: deps.middlewareChain },
-          selectGatewayEffect,
-        );
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "No gateways registered — cannot relay task";
-        return { statusCode: 503, payload: apiError(context.correlationId, "unavailable", message) };
+      const gateways = deps.gatewayRegistry.list();
+      const gw = gateways[0];
+      if (!gw) {
+        return { statusCode: 503, payload: apiError(context.correlationId, "unavailable", "No gateways registered — cannot relay task") };
       }
       const relayOpts: ChatRelayOptions = {
         host: gw.host,
@@ -358,10 +343,7 @@ export async function handleOpenClawRequest(
             ...(action ? { action } : {}),
             ...(args ? { args } : {}),
           };
-          const mwResult = await runOpenClawEffect(
-            { gatewayRegistry: deps.gatewayRegistry, middlewareChain: deps.middlewareChain },
-            invokeToolEffect(context, invokeRequest, {}),
-          );
+          const mwResult = await deps.middlewareChain.execute(context, invokeRequest, {});
           return {
             ok: !mwResult.blocked && !mwResult.requiresApproval,
             status: mwResult.envelope.status,
@@ -380,7 +362,7 @@ export async function handleOpenClawRequest(
       };
 
       // Use the orchestrator if available, fall back to the old decomposer
-      const orchestrator = deps.orchestrator ?? new EffectfulOpenClawOrchestrator(
+      const orchestrator = deps.orchestrator ?? new OpenClawOrchestrator(
         deps.orchestratorConfig,
         deps.orchestratorLlm ?? null,
       );
