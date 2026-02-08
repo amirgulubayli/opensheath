@@ -33,6 +33,8 @@ export interface AgentExecutionResult {
   run: AgentRunRecord;
   toolCall: ToolCallRecord;
   output?: unknown;
+  assistantMessage?: string;
+  responseId?: string;
 }
 
 export interface ModerationCheckInput {
@@ -49,6 +51,28 @@ export interface ModerationCheckResult {
 
 export interface ModerationService {
   evaluate(input: ModerationCheckInput): Promise<ModerationCheckResult>;
+}
+
+export interface LlmGatewayInput {
+  toolName: string;
+  toolInput: unknown;
+  toolOutput: unknown;
+  context: RequestContext;
+  threadId?: string;
+}
+
+export interface LlmGatewayResult {
+  responseText: string;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: number;
+  modelName: string;
+  modelVersion: string;
+  responseId?: string;
+}
+
+export interface LlmGateway {
+  generateToolSummary(input: LlmGatewayInput): Promise<LlmGatewayResult>;
 }
 
 const BLOCKED_PATTERNS: RegExp[] = [
@@ -140,6 +164,7 @@ export class InMemoryAgentRuntimeService {
       maxToolRetries: 2,
     },
     private readonly moderationService: ModerationService = new InMemoryModerationService(),
+    private readonly llmGateway?: LlmGateway,
   ) {}
 
   async execute(
@@ -326,23 +351,51 @@ export class InMemoryAgentRuntimeService {
       });
       this.transitionRun(runId, "running");
       this.transitionRun(runId, "completed");
+      const completedAt = new Date().toISOString();
+      let inputTokens = this.estimateTokens(input.toolInput);
+      let outputTokens = this.estimateTokens(output);
+      let estimatedCostUsd = this.estimateCostUsd(inputTokens, outputTokens);
+      let modelName = this.options.modelName;
+      let modelVersion = this.options.modelVersion;
+      let assistantMessage: string | undefined;
+      let responseId: string | undefined;
+
+      if (this.llmGateway) {
+        try {
+          const summary = await this.llmGateway.generateToolSummary({
+            toolName: input.toolName,
+            toolInput: input.toolInput,
+            toolOutput: output,
+            context,
+            ...(input.threadId ? { threadId: input.threadId } : {}),
+          });
+          assistantMessage = summary.responseText;
+          responseId = summary.responseId;
+          inputTokens = summary.inputTokens;
+          outputTokens = summary.outputTokens;
+          estimatedCostUsd = summary.estimatedCostUsd;
+          modelName = summary.modelName;
+          modelVersion = summary.modelVersion;
+        } catch {
+          // Keep fallback estimates if the gateway fails.
+        }
+      }
+
       this.setRun(runId, {
-        completedAt: new Date().toISOString(),
-        inputTokens: this.estimateTokens(input.toolInput),
-        outputTokens: this.estimateTokens(output),
-      });
-      const finalizedRun = this.requireRun(runId);
-      this.setRun(runId, {
-        estimatedCostUsd: this.estimateCostUsd(
-          finalizedRun.inputTokens,
-          finalizedRun.outputTokens,
-        ),
+        completedAt,
+        inputTokens,
+        outputTokens,
+        estimatedCostUsd,
+        modelName,
+        modelVersion,
       });
 
       return {
         run: this.requireRun(runId),
         toolCall: this.requireToolCall(toolCallId),
         output,
+        ...(assistantMessage ? { assistantMessage } : {}),
+        ...(responseId ? { responseId } : {}),
       };
     } catch (error: unknown) {
       if (error instanceof DomainError) {

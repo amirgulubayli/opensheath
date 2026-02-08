@@ -8,7 +8,7 @@ import {
   resolveNavigation,
 } from "./app-shell.js";
 
-test("protected route redirects to sign-in when unauthenticated", () => {
+test("removed route redirects to not-found", () => {
   const result = resolveNavigation({
     path: "/dashboard",
     isAuthenticated: false,
@@ -16,12 +16,12 @@ test("protected route redirects to sign-in when unauthenticated", () => {
 
   assert.deepEqual(result, {
     kind: "redirect",
-    to: "/sign-in",
-    reason: "auth_required",
+    to: "/not-found",
+    reason: "route_not_found",
   });
 });
 
-test("sign-in route redirects to dashboard when authenticated", () => {
+test("sign-in route redirects to home when authenticated", () => {
   const result = resolveNavigation({
     path: "/sign-in",
     isAuthenticated: true,
@@ -29,7 +29,7 @@ test("sign-in route redirects to dashboard when authenticated", () => {
 
   assert.deepEqual(result, {
     kind: "redirect",
-    to: "/dashboard",
+    to: "/",
     reason: "already_authenticated",
   });
 });
@@ -49,13 +49,13 @@ test("unknown routes redirect to not-found", () => {
 
 test("normalize path behavior allows rendering route with trailing slash", () => {
   const result = resolveNavigation({
-    path: "/workspaces/",
+    path: "/openclaw/",
     isAuthenticated: true,
   });
 
   assert.equal(result.kind, "render");
   if (result.kind === "render") {
-    assert.equal(result.route.id, "workspaces");
+    assert.equal(result.route.id, "openclaw");
   }
 });
 

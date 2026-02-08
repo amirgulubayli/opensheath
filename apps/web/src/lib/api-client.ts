@@ -389,6 +389,34 @@ export async function listConnectors(input: {
   );
 }
 
+export async function revokeConnector(input: {
+  sessionId: string;
+  connectorId: string;
+}): Promise<ApiResponse<{ connector: ConnectorRecord }>> {
+  return request<{ connector: ConnectorRecord }>("/integrations/connectors/revoke", {
+    method: "POST",
+    sessionId: input.sessionId,
+    body: { connectorId: input.connectorId },
+  });
+}
+
+export async function recordConnectorHealth(input: {
+  sessionId: string;
+  connectorId: string;
+  healthStatus: "healthy" | "degraded" | "unreachable";
+  errorMessage?: string;
+}): Promise<ApiResponse<{ connector: ConnectorRecord }>> {
+  return request<{ connector: ConnectorRecord }>("/integrations/connectors/health", {
+    method: "POST",
+    sessionId: input.sessionId,
+    body: {
+      connectorId: input.connectorId,
+      healthStatus: input.healthStatus,
+      ...(input.errorMessage ? { errorMessage: input.errorMessage } : {}),
+    },
+  });
+}
+
 export async function createAutomationRule(input: {
   sessionId: string;
   eventType: string;

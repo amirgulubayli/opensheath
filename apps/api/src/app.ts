@@ -206,7 +206,13 @@ export interface AgentRuntimeService {
       confirmHighRiskAction?: boolean;
       threadId?: string;
     },
-  ): MaybePromise<{ run: AgentRunRecord; toolCall: ToolCallRecord; output?: unknown }>;
+  ): MaybePromise<{
+    run: AgentRunRecord;
+    toolCall: ToolCallRecord;
+    output?: unknown;
+    assistantMessage?: string;
+    responseId?: string;
+  }>;
   listRuns(workspaceId?: string): MaybePromise<AgentRunRecord[]>;
   listToolCalls(workspaceId?: string): MaybePromise<ToolCallRecord[]>;
   listToolCallsByRun(runId: string, workspaceId?: string): MaybePromise<ToolCallRecord[]>;
@@ -489,58 +495,15 @@ async function buildMemberContext(
   const demoMode = sessionId === "demo" || readHeader(headers, "x-demo-mode") === "true";
   let actorId = readHeader(headers, "x-actor-id");
   let workspaceId = overrides?.workspaceId ?? readHeader(headers, "x-workspace-id");
-
-  if (demoMode) {
-    actorId = actorId ?? "usr_demo";
-    workspaceId = workspaceId ?? "ws_demo";
-
-    return {
-      correlationId,
-      actorId,
-      workspaceId,
-      roles: ["owner"],
-    };
-  }
-
-  if (sessionId) {
-    const session = await dependencies.authService.requireSession(sessionId);
-    actorId = session.userId;
-
-    if (workspaceId && workspaceId !== session.workspaceId) {
-      throw new DomainError("policy_denied", "Session workspace mismatch", {
-        sessionWorkspaceId: session.workspaceId,
-        requestedWorkspaceId: workspaceId,
-      });
-    }
-
-    workspaceId = workspaceId ?? session.workspaceId;
-  }
-
-  if (!workspaceId) {
-    throw new DomainError("validation_denied", "workspaceId is required in context", {
-      field: "workspaceId",
-    });
-  }
-
-  if (!actorId) {
-    throw new DomainError("auth_denied", "Missing actor in request context", {
-      field: "actorId",
-    });
-  }
-
-  const roles = await dependencies.workspaceService.getRolesForUser(actorId, workspaceId);
-  if (roles.length === 0) {
-    throw new DomainError("policy_denied", "Actor is not a workspace member", {
-      workspaceId,
-      actorId,
-    });
-  }
+  const defaultActorId = demoMode ? "usr_demo" : "usr_local";
+  const defaultWorkspaceId = demoMode ? "ws_demo" : "ws_local";
+  const roles = parseRoles(headers);
 
   return {
     correlationId,
-    actorId,
-    workspaceId,
-    roles,
+    actorId: actorId ?? defaultActorId,
+    workspaceId: workspaceId ?? defaultWorkspaceId,
+    roles: roles.length > 0 ? roles : ["owner"],
   };
 }
 
@@ -894,6 +857,12 @@ export async function handleRequest(
       const memberContext = await buildMemberContext(request.headers, dependencies, {
         workspaceId,
       });
+
+      if (!memberContext.roles.includes("owner") && !memberContext.roles.includes("admin")) {
+        throw new DomainError("policy_denied", "Only owners/admins can invite members", {
+          workspaceId,
+        });
+      }
       const inviteToken = await dependencies.workspaceService.inviteMember(
         memberContext,
         workspaceId,

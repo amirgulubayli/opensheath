@@ -1,0 +1,21 @@
+The filename, directory name, or volume label syntax is incorrect.
+'Set-Content' is not recognized as an internal or external command,
+operable program or batch file.
+'$r' is not recognized as an internal or external command,
+operable program or batch file.
+'$body' is not recognized as an internal or external command,
+operable program or batch file.
+'rd-ws";"x-actor-role"="operator"}' is not recognized as an internal or external command,
+operable program or batch file.
+'estMethod' is not recognized as an internal or external command,
+operable program or batch file.
+'on' is not recognized as an internal or external command,
+operable program or batch file.
+'Test-NetConnection' is not recognized as an internal or external command,
+operable program or batch file.
+'Get-NetTCPConnection' is not recognized as an internal or external command,
+operable program or batch file.
+'Get-NetTCPConnection' is not recognized as an internal or external command,
+operable program or batch file.
+'etstat' is not recognized as an internal or external command,
+operable program or batch file.

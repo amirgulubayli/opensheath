@@ -1,7 +1,23 @@
+import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { config as loadEnv } from "dotenv";
+
+const envCandidates = [
+  resolve(process.cwd(), ".env"),
+  resolve(process.cwd(), "..", ".env"),
+  resolve(process.cwd(), "..", "..", ".env"),
+  resolve(process.cwd(), "..", "..", "..", ".env"),
+];
+
+for (const candidate of envCandidates) {
+  if (existsSync(candidate)) {
+    loadEnv({ path: candidate });
+    break;
+  }
+}
 
 import {
   apiError,
@@ -44,6 +60,7 @@ import {
 } from "./alerts.js";
 import { loadRuntimeConfig, type RuntimeConfig } from "./env.js";
 import { InMemoryRequestMetrics, StructuredLogger } from "./observability.js";
+import { OpenAiResponsesGateway } from "./openai-gateway.js";
 import {
   DEFAULT_TENANT_ALERT_THRESHOLDS,
   evaluateTenantIsolationAlerts,
@@ -62,6 +79,22 @@ import {
   PostgresWebhookDeliveryService,
   PostgresWorkspaceService,
 } from "./persistence-services.js";
+import {
+  handleOpenClawRequest,
+  type OpenClawDependencies,
+} from "./openclaw-routes.js";
+import { HttpToolsInvokeClient } from "./openclaw-client.js";
+import {
+  OpenClawGatewayRegistry,
+  OpenClawWorkspaceBindingService,
+  OpenClawToolCatalog,
+  OpenClawPolicyCompiler,
+  OpenClawKillSwitch,
+  OpenClawAuditTrail,
+  OpenClawInvocationStore,
+  OpenClawSwarmOrchestrator,
+  OpenClawMiddlewareChain,
+} from "@ethoxford/domain";
 
 interface RequestErrorPayload {
   code: ApiErrorCode;
@@ -71,6 +104,7 @@ interface RequestErrorPayload {
 export interface ApiServerOptions {
   runtime?: RuntimeConfig;
   dependencies?: AppDependencies;
+  openClawDeps?: OpenClawDependencies;
   logger?: StructuredLogger;
   requestMetrics?: InMemoryRequestMetrics;
   tenantMetrics?: InMemoryTenantIsolationMetrics;
@@ -87,12 +121,46 @@ function applySecurityHeaders(res: import("node:http").ServerResponse): void {
   res.setHeader("permissions-policy", "geolocation=(), microphone=(), camera=()");
 }
 
+function isAllowedOrigin(origin: string): boolean {
+  return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
+
+function applyCorsHeaders(
+  res: import("node:http").ServerResponse,
+  origin: string | undefined,
+): void {
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader("access-control-allow-origin", origin);
+    res.setHeader("vary", "origin");
+  }
+
+  res.setHeader(
+    "access-control-allow-methods",
+    "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+  );
+  res.setHeader(
+    "access-control-allow-headers",
+    "content-type,x-session-id,x-workspace-id,x-actor-id,x-actor-role,x-request-id,x-correlation-id",
+  );
+  res.setHeader("access-control-max-age", "600");
+}
+
 function createDefaultDependencies(options?: {
   enableBillingTools?: boolean;
+  enableAiFeatures?: boolean;
   databaseUrl?: string;
+  openAiApiKey?: string;
+  openAiModel?: string;
 }): AppDependencies {
   const enableBillingTools = options?.enableBillingTools ?? true;
   const pool = options?.databaseUrl ? createApiPool(options.databaseUrl) : undefined;
+  const llmGateway =
+    options?.enableAiFeatures && options?.openAiApiKey
+      ? new OpenAiResponsesGateway({
+          apiKey: options.openAiApiKey,
+          ...(options.openAiModel ? { model: options.openAiModel } : {}),
+        })
+      : undefined;
   const authService = new InMemoryAuthService();
   const workspaceService = pool
     ? new PostgresWorkspaceService(pool)
@@ -121,8 +189,8 @@ function createDefaultDependencies(options?: {
     : new InMemoryWebhookDeliveryService();
   const toolRegistry = new InMemoryToolRegistry();
   const agentRuntimeService = pool
-    ? new PostgresAgentRuntimeService(pool, toolRegistry)
-    : new InMemoryAgentRuntimeService(toolRegistry);
+    ? new PostgresAgentRuntimeService(pool, toolRegistry, llmGateway)
+    : new InMemoryAgentRuntimeService(toolRegistry, undefined, undefined, llmGateway);
   const billingService = pool
     ? new PostgresBillingService(pool)
     : new InMemoryBillingService();
@@ -536,6 +604,94 @@ function createDefaultDependencies(options?: {
   };
 }
 
+function createOpenClawDependencies(): OpenClawDependencies {
+  const gatewayRegistry = new OpenClawGatewayRegistry();
+  const bindingService = new OpenClawWorkspaceBindingService();
+  const toolCatalog = new OpenClawToolCatalog();
+  const policyCompiler = new OpenClawPolicyCompiler();
+  const killSwitch = new OpenClawKillSwitch();
+  const auditTrail = new OpenClawAuditTrail();
+  const invocationStore = new OpenClawInvocationStore();
+  const swarmOrchestrator = new OpenClawSwarmOrchestrator();
+  const gatewayClient = new HttpToolsInvokeClient({ tls: false });
+
+  const middlewareChain = new OpenClawMiddlewareChain(
+    gatewayRegistry,
+    bindingService,
+    toolCatalog,
+    policyCompiler,
+    killSwitch,
+    auditTrail,
+    invocationStore,
+    gatewayClient,
+  );
+
+  // ── Seed default OpenClaw gateway, binding & policy ────────────
+  // Uses env vars if set, otherwise falls back to the VPS gateway.
+  const seedHost = process.env.OPENCLAW_GATEWAY_HOST ?? "100.111.98.27";
+  const seedPort = Number(process.env.OPENCLAW_GATEWAY_PORT ?? "18790");
+  const seedToken = process.env.OPENCLAW_GATEWAY_TOKEN ?? "6926c794baef57e9afe248638f1b48a93cc74d3a9ce27796";
+  const seedWs = process.env.OPENCLAW_DEFAULT_WORKSPACE ?? "ethoxford-ws";
+
+  const defaultGw = gatewayRegistry.register({
+    environment: "production",
+    host: seedHost,
+    port: seedPort,
+    authMode: "token" as import("@ethoxford/contracts").OpenClawGatewayAuthMode,
+    tokenRef: seedToken,
+    basePath: "",
+    loopbackOnly: false,
+  });
+
+  bindingService.bind({
+    workspaceId: seedWs,
+    gatewayId: defaultGw.gatewayId,
+    defaultSessionKey: "main",
+    agentIdPrefix: seedWs,
+  });
+
+  // Permissive allow-all policy for the default workspace so invocations
+  // are not denied by the deny-by-default middleware policy.
+  policyCompiler.addRule({
+    workspaceId: seedWs,
+    role: "*",
+    toolName: "*",
+    action: "*",
+    decision: "allow" as import("@ethoxford/contracts").OpenClawPolicyDecision,
+  });
+
+  // Register a wildcard tool catalog entry with low risk so invocations
+  // don't require approval by default.
+  toolCatalog.register({
+    toolName: "*",
+    gatewayId: defaultGw.gatewayId,
+    riskTier: 0 as import("@ethoxford/contracts").OpenClawToolRiskTier,
+    approvalRequired: "none",
+    allowedActions: ["*"],
+    description: "Default wildcard – allows any tool through the gateway",
+    allowedWorkspaces: ["*"],
+    allowedRoles: ["owner", "admin", "member", "operator"],
+  });
+
+  console.log(
+    `[openclaw] Seeded default gateway ${defaultGw.gatewayId} → ${seedHost}:${seedPort}, ` +
+    `bound to workspace "${seedWs}" with allow-all policy`,
+  );
+  // ── End seed ───────────────────────────────────────────────────
+
+  return {
+    gatewayRegistry,
+    bindingService,
+    toolCatalog,
+    policyCompiler,
+    killSwitch,
+    auditTrail,
+    invocationStore,
+    swarmOrchestrator,
+    middlewareChain,
+  };
+}
+
 function headerValue(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) {
     return value[0];
@@ -757,7 +913,7 @@ async function resolveAiObservabilityWorkspace(
     });
   }
 
-  const roles = dependencies.workspaceService.getRolesForUser(actorId, workspaceId);
+  const roles = await dependencies.workspaceService.getRolesForUser(actorId, workspaceId);
   if (roles.length === 0) {
     throw new DomainError("policy_denied", "Actor is not a workspace member", {
       workspaceId,
@@ -803,11 +959,15 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
   const dependencies = options.dependencies ??
     createDefaultDependencies({
       enableBillingTools: runtime?.enableBilling ?? true,
+      enableAiFeatures: runtime?.enableAiFeatures ?? false,
       ...(runtime?.databaseUrl ? { databaseUrl: runtime.databaseUrl } : {}),
+      ...(runtime?.openAiApiKey ? { openAiApiKey: runtime.openAiApiKey } : {}),
+      ...(runtime?.openAiModel ? { openAiModel: runtime.openAiModel } : {}),
     });
   const logger = options.logger ?? new StructuredLogger("api");
   const requestMetrics = options.requestMetrics ?? new InMemoryRequestMetrics("api");
   const tenantMetrics = options.tenantMetrics ?? new InMemoryTenantIsolationMetrics();
+  const openClawDeps = options.openClawDeps ?? createOpenClawDependencies();
 
   return createServer(async (req, res) => {
     const chunks: Buffer[] = [];
@@ -819,6 +979,7 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
     const workspaceId = headerValue(req.headers["x-workspace-id"]);
     const actorId = headerValue(req.headers["x-actor-id"]);
     const sessionId = headerValue(req.headers["x-session-id"]);
+    const origin = headerValue(req.headers.origin);
     const { requestId, correlationId } = resolveRequestIds(
       req.headers as Record<string, string | string[] | undefined>,
     );
@@ -843,6 +1004,32 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
       event: "request.start",
       ...requestContext,
     });
+
+    applyCorsHeaders(res, origin);
+
+    if (method === "OPTIONS") {
+      const preflightDuration = durationMs(startedAt);
+      requestMetrics.record({
+        method,
+        path,
+        statusCode: 204,
+        durationMs: preflightDuration,
+      });
+
+      logger.log({
+        event: "request.complete",
+        ...requestContext,
+        statusCode: 204,
+        durationMs: preflightDuration,
+      });
+
+      res.statusCode = 204;
+      applySecurityHeaders(res);
+      res.setHeader("x-request-id", requestId);
+      res.setHeader("x-correlation-id", correlationId);
+      res.end();
+      return;
+    }
 
     if (method === "GET" && path === "/metrics") {
       const snapshot = requestMetrics.snapshot();
@@ -1020,6 +1207,67 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
       return;
     }
 
+    // ── OpenClaw routes (/openclaw/*) ──
+    if (path.startsWith("/openclaw/")) {
+      req.on("data", (chunk) => { chunks.push(Buffer.from(chunk)); });
+      req.on("end", async () => {
+        try {
+          const body = Buffer.concat(chunks).toString("utf8");
+          const roles: string[] = [];
+          const headerRole = headerValue(req.headers["x-actor-role"]);
+          if (headerRole) {
+            roles.push(headerRole);
+          }
+          if (workspaceId && actorId) {
+            try {
+              const r = await dependencies.workspaceService.getRolesForUser(actorId, workspaceId);
+              for (const role of r) {
+                if (!roles.includes(role)) roles.push(role);
+              }
+            } catch { /* anonymous context */ }
+          }
+          const ctx: import("@ethoxford/domain").RequestContext = {
+            correlationId,
+            roles,
+            ...(workspaceId ? { workspaceId } : {}),
+            ...(actorId ? { actorId } : {}),
+          };
+          const result = await handleOpenClawRequest(method, path, body, ctx, openClawDeps);
+          const ocDuration = durationMs(startedAt);
+          if (!result) {
+            requestMetrics.record({ method, path, statusCode: 404, durationMs: ocDuration, errorCode: "not_found" });
+            res.statusCode = 404;
+            res.setHeader("content-type", "application/json");
+            applySecurityHeaders(res);
+            res.setHeader("x-request-id", requestId);
+            res.setHeader("x-correlation-id", correlationId);
+            res.end(JSON.stringify(apiError(correlationId, "not_found", "OpenClaw route not found", { path })));
+            return;
+          }
+          requestMetrics.record({ method, path, statusCode: result.statusCode, durationMs: ocDuration });
+          logger.log({ event: result.statusCode < 400 ? "request.complete" : "request.error", requestId, correlationId, method, path, statusCode: result.statusCode, durationMs: ocDuration });
+          res.statusCode = result.statusCode;
+          res.setHeader("content-type", "application/json");
+          applySecurityHeaders(res);
+          res.setHeader("x-request-id", requestId);
+          res.setHeader("x-correlation-id", correlationId);
+          res.end(JSON.stringify(result.payload));
+        } catch (error: unknown) {
+          const failDur = durationMs(startedAt);
+          const msg = error instanceof Error ? error.message : "Unknown error";
+          requestMetrics.record({ method, path, statusCode: 500, durationMs: failDur, errorCode: "internal_error" });
+          logger.log({ event: "request.error", requestId, correlationId, method, path, statusCode: 500, durationMs: failDur, errorCode: "internal_error", errorMessage: msg });
+          res.statusCode = 500;
+          res.setHeader("content-type", "application/json");
+          applySecurityHeaders(res);
+          res.setHeader("x-request-id", requestId);
+          res.setHeader("x-correlation-id", correlationId);
+          res.end(JSON.stringify(apiError(correlationId, "internal_error", msg)));
+        }
+      });
+      return;
+    }
+
     if (method === "GET" && path === "/metrics/ai") {
       const requestedWorkspaceId = parsedUrl.searchParams.get("workspaceId") ?? undefined;
       let workspaceId: string;
@@ -1074,8 +1322,8 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
         throw error;
       }
 
-      const runs = dependencies.agentRuntimeService.listRuns();
-      const toolCalls = dependencies.agentRuntimeService.listToolCalls();
+      const runs = await dependencies.agentRuntimeService.listRuns();
+      const toolCalls = await dependencies.agentRuntimeService.listToolCalls();
       const snapshot = summarizeAiRuntimeMetrics({
         runs: runs.filter((run) => run.workspaceId === workspaceId),
         toolCalls: toolCalls.filter((call) => call.workspaceId === workspaceId),
@@ -1165,8 +1413,8 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
         throw error;
       }
 
-      const runs = dependencies.agentRuntimeService.listRuns();
-      const toolCalls = dependencies.agentRuntimeService.listToolCalls();
+      const runs = await dependencies.agentRuntimeService.listRuns();
+      const toolCalls = await dependencies.agentRuntimeService.listToolCalls();
       const snapshot = summarizeAiRuntimeMetrics({
         runs: runs.filter((run) => run.workspaceId === workspaceId),
         toolCalls: toolCalls.filter((call) => call.workspaceId === workspaceId),
@@ -1411,5 +1659,19 @@ export function startApiServer(options: ApiServerOptions = {}): Server {
 }
 
 if (isExecutedDirectly()) {
-  startApiServer();
+  const _server = startApiServer();
+  // Ignore stray SIGINT/SIGTERM during the first 5 seconds (IDE terminals
+  // sometimes deliver a spurious signal right after process spawn).
+  const _ignoreUntil = Date.now() + 5_000;
+  const _graceful = (sig: string) => {
+    if (Date.now() < _ignoreUntil) {
+      console.log(`[api] Ignoring early ${sig} (startup grace period)`);
+      return;
+    }
+    console.log(`[api] Received ${sig}, shutting down gracefully …`);
+    _server.close(() => process.exit(0));
+    setTimeout(() => process.exit(1), 5_000).unref();
+  };
+  process.on("SIGINT", () => _graceful("SIGINT"));
+  process.on("SIGTERM", () => _graceful("SIGTERM"));
 }

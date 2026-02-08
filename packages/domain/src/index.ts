@@ -8,3 +8,4 @@ export * from "./ai-runtime.js";
 export * from "./integrations.js";
 export * from "./billing.js";
 export * from "./release.js";
+export * from "./openclaw.js";

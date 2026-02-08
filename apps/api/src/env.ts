@@ -9,6 +9,7 @@ export interface RuntimeConfig {
   enableBilling: boolean;
   databaseUrl?: string;
   openAiApiKey?: string;
+  openAiModel?: string;
   stripeSecretKey?: string;
   stripeWebhookSecret?: string;
 }
@@ -80,6 +81,7 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     env.OPENAI_API_KEY,
     "OPENAI_API_KEY",
   );
+  const openAiModel = env.OPENAI_MODEL?.trim();
 
   const stripeSecretKey = requireWhenEnabled(
     enableBilling,
@@ -102,6 +104,7 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     enableBilling,
     ...(databaseUrl ? { databaseUrl } : {}),
     ...(openAiApiKey ? { openAiApiKey } : {}),
+    ...(openAiModel ? { openAiModel } : {}),
     ...(stripeSecretKey ? { stripeSecretKey } : {}),
     ...(stripeWebhookSecret ? { stripeWebhookSecret } : {}),
   };

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 260" fill="none">
+  <!-- Outer shield -->
+  <path d="M100 10 L180 50 L180 140 C180 190 145 230 100 250 C55 230 20 190 20 140 L20 50 Z"
+        stroke="url(#grad1)" stroke-width="4" fill="none" opacity="0.35"/>
+  <!-- Middle shield -->
+  <path d="M100 30 L165 62 L165 135 C165 178 135 212 100 228 C65 212 35 178 35 135 L35 62 Z"
+        stroke="url(#grad1)" stroke-width="3.5" fill="none" opacity="0.55"/>
+  <!-- Inner shield -->
+  <path d="M100 50 L150 75 L150 130 C150 165 128 194 100 206 C72 194 50 165 50 130 L50 75 Z"
+        stroke="url(#grad1)" stroke-width="3" fill="none" opacity="0.8"/>
+  <!-- Blade / quill -->
+  <path d="M100 70 C103 70 108 90 108 110 L108 180 C108 185 105 190 100 195 C95 190 92 185 92 180 L92 110 C92 90 97 70 100 70Z"
+        fill="url(#grad1)" opacity="0.85"/>
+  <!-- Blade highlight -->
+  <path d="M100 75 C101.5 75 104 90 104 110 L104 178 C104 182 102 186 100 188 L100 75Z"
+        fill="url(#grad2)" opacity="0.5"/>
+  <defs>
+    <linearGradient id="grad1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c0cfe0"/>
+      <stop offset="100%" stop-color="#7a8ea8"/>
+    </linearGradient>
+    <linearGradient id="grad2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e0e8f0"/>
+      <stop offset="100%" stop-color="#a0b4c8"/>
+    </linearGradient>
+  </defs>
+</svg>

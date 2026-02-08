@@ -1,0 +1,13 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "npm run -w @ethoxford/contracts": true,
+        "npm run -w @ethoxford/domain": true,
+        "npm run -w @ethoxford/api": true,
+        "npm install": true,
+        "npx tsx": true,
+        "/^node --import tsx apps/api/src/server\\.ts$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

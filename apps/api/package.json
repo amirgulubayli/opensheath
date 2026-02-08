@@ -7,7 +7,11 @@
   "dependencies": {
     "@ethoxford/contracts": "0.1.0",
     "@ethoxford/domain": "0.1.0",
-    "@ethoxford/persistence": "0.1.0"
+    "@ethoxford/persistence": "0.1.0",
+    "@types/ws": "^8.18.1",
+    "dotenv": "^16.4.7",
+    "openai": "^4.104.0",
+    "ws": "^8.19.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

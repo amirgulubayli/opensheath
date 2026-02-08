@@ -92,9 +92,16 @@ export function prepareAiExecuteRequest(
 
 export function mapAiExecuteResponse(response: ApiResponse<unknown>): AiActionResultState {
   if (response.ok) {
+    const assistantMessage =
+      response.data &&
+      typeof (response.data as { assistantMessage?: unknown }).assistantMessage === "string"
+        ? (response.data as { assistantMessage?: string }).assistantMessage
+        : undefined;
     return {
       status: "succeeded",
-      message: "Action completed successfully.",
+      message: assistantMessage
+        ? `Action completed successfully. ${assistantMessage}`
+        : "Action completed successfully.",
       retryable: false,
     };
   }

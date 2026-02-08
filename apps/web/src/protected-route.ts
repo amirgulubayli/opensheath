@@ -1,10 +1,6 @@
 import type { ApiResponse, SessionDto } from "@ethoxford/contracts";
 
-import {
-  mapSessionCheckResponse,
-  signedOutState,
-  type AuthShellState,
-} from "./auth-shell.js";
+import { mapSessionCheckResponse, type AuthShellState } from "./auth-shell.js";
 import { resolveNavigation, type NavigationDecision } from "./app-shell.js";
 
 export interface ProtectedRouteDecision {
@@ -22,12 +18,15 @@ export function decideProtectedRoute(
 ): ProtectedRouteDecision {
   if (!input.sessionResponse) {
     return {
-      authState: signedOutState(),
-      navigation: {
-        kind: "redirect",
-        to: "/sign-in",
-        reason: "auth_required",
+      authState: {
+        status: "signed_in",
+        message: "Local session enabled.",
+        retryable: false,
       },
+      navigation: resolveNavigation({
+        path: input.path,
+        isAuthenticated: true,
+      }),
     };
   }
 

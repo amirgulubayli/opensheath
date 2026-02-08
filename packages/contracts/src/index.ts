@@ -517,6 +517,14 @@ export type AppRouteId =
   | "sign_in"
   | "dashboard"
   | "workspaces"
+  | "ai"
+  | "retrieval"
+  | "analytics"
+  | "automation"
+  | "integrations"
+  | "notifications"
+  | "webhooks"
+  | "openclaw"
   | "settings"
   | "not_found";
 
@@ -602,6 +610,8 @@ export function apiError(
 
   return failure;
 }
+
+export * from "./openclaw.js";
 
 export function normalizeAppPath(path: string): string {
   const trimmed = path.trim();

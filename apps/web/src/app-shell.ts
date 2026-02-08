@@ -18,64 +18,16 @@ export const APP_SHELL_ROUTES: readonly AppShellRoute[] = [
     requiresAuth: false,
   },
   {
-    id: "dashboard",
-    path: "/dashboard",
-    title: "Dashboard",
-    requiresAuth: true,
-  },
-  {
-    id: "workspaces",
-    path: "/workspaces",
-    title: "Workspaces",
-    requiresAuth: true,
-  },
-  {
-    id: "ai",
-    path: "/ai",
-    title: "AI",
-    requiresAuth: true,
-  },
-  {
-    id: "retrieval",
-    path: "/retrieval",
-    title: "Retrieval",
-    requiresAuth: true,
-  },
-  {
-    id: "analytics",
-    path: "/analytics",
-    title: "Analytics",
-    requiresAuth: true,
-  },
-  {
-    id: "automation",
-    path: "/automation",
-    title: "Automation",
-    requiresAuth: true,
+    id: "openclaw",
+    path: "/openclaw",
+    title: "OpenClaw",
+    requiresAuth: false,
   },
   {
     id: "integrations",
     path: "/integrations",
     title: "Integrations",
-    requiresAuth: true,
-  },
-  {
-    id: "notifications",
-    path: "/notifications",
-    title: "Notifications",
-    requiresAuth: true,
-  },
-  {
-    id: "webhooks",
-    path: "/webhooks",
-    title: "Webhooks",
-    requiresAuth: true,
-  },
-  {
-    id: "settings",
-    path: "/settings",
-    title: "Settings",
-    requiresAuth: true,
+    requiresAuth: false,
   },
   {
     id: "not_found",
@@ -128,7 +80,7 @@ export function resolveNavigation(input: NavigationInput): NavigationDecision {
   if (route.id === "sign_in" && input.isAuthenticated) {
     return {
       kind: "redirect",
-      to: "/dashboard",
+      to: "/",
       reason: "already_authenticated",
     };
   }

@@ -39,6 +39,7 @@ import {
   InMemoryBillingService,
   InMemoryToolRegistry,
   ensureWorkspaceContext,
+  type LlmGateway,
   type RequestContext,
   type Role,
 } from "@ethoxford/domain";
@@ -2245,8 +2246,14 @@ export class PostgresAgentRuntimeService {
   constructor(
     private readonly pool: Pool,
     registry: InMemoryToolRegistry,
+    llmGateway?: LlmGateway,
   ) {
-    this.runtime = new InMemoryAgentRuntimeService(registry);
+    this.runtime = new InMemoryAgentRuntimeService(
+      registry,
+      undefined,
+      undefined,
+      llmGateway,
+    );
   }
 
   async execute(
@@ -2257,7 +2264,13 @@ export class PostgresAgentRuntimeService {
       confirmHighRiskAction?: boolean;
       threadId?: string;
     },
-  ): Promise<{ run: AgentRunRecord; toolCall: ToolCallRecord; output?: unknown }> {
+  ): Promise<{
+    run: AgentRunRecord;
+    toolCall: ToolCallRecord;
+    output?: unknown;
+    assistantMessage?: string;
+    responseId?: string;
+  }> {
     const result = await this.runtime.execute(context, input);
     await this.persistRun(context, result.run);
     await this.persistToolCall(context, result.toolCall);

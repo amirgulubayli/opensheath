@@ -15,7 +15,7 @@ This is a step-by-step guide for a brand‑new developer to get the full app run
 
 ```bash
 git clone <your-repo-url>
-cd ethoxford26
+cd opensheath
 ```
 
 ## 3) Install dependencies (monorepo)
@@ -49,6 +49,7 @@ ENABLE_BILLING=false
 ```
 
 If you set `ENABLE_AI_FEATURES=true`, you must set `OPENAI_API_KEY`.
+Optional: set `OPENAI_MODEL` to override the default (`gpt-4.1-mini`).
 If you set `ENABLE_BILLING=true`, you must set `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`.
 
 ## 5) Start Postgres (Docker)
