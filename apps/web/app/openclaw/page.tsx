@@ -8,6 +8,7 @@ import type {
   InvokeEnvelope,
   KillSwitchRecord,
   SwarmRun,
+  ConnectionsOverview,
 } from "../../src/lib/openclaw-client";
 import {
   getMetrics,
@@ -16,7 +17,8 @@ import {
   listKillSwitches,
   listSwarmRuns,
   invokeTool,
-  chatWithAgent,
+  executeTask,
+  getConnections,
 } from "../../src/lib/openclaw-client";
 
 /* ─── Types ─── */
@@ -43,6 +45,7 @@ interface SidebarData {
   invocations: InvokeEnvelope[];
   killSwitches: KillSwitchRecord[];
   swarms: SwarmRun[];
+  connections: ConnectionsOverview | null;
 }
 
 /* ─── Page ─── */
@@ -54,7 +57,7 @@ export default function OpenClawPage() {
       id: "welcome",
       role: "system",
       content:
-        "Hey! I'm your ClosedSheath operator. Ask me to run tools, check gateway status, or kick off swarm tasks.\n\n• \"list_sessions\" — invoke a tool\n• \"gateways\" — gateway status\n• \"metrics\" — system stats\n• \"swarms\" — swarm progress",
+        "Hey! I'm your ClosedSheath relay. Everything goes straight to OpenClaw — complex requests are auto-decomposed into concurrent sub-tasks.\n\n• Just ask naturally — relayed to OpenClaw\n• **gateways** — gateway status\n• **metrics** — system stats\n• **swarms** — swarm progress",
       timestamp: Date.now(),
     },
   ]);
@@ -66,6 +69,7 @@ export default function OpenClawPage() {
     invocations: [],
     killSwitches: [],
     swarms: [],
+    connections: null,
   });
   const chatEnd = useRef<HTMLDivElement>(null);
 
@@ -73,12 +77,13 @@ export default function OpenClawPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [m, g, i, k, s] = await Promise.all([
+        const [m, g, i, k, s, c] = await Promise.all([
           getMetrics(),
           listGateways(),
           listInvocations(),
           listKillSwitches(),
           listSwarmRuns(),
+          getConnections(),
         ]);
         setSidebar({
           metrics: m ?? null,
@@ -87,6 +92,7 @@ export default function OpenClawPage() {
           killSwitches:
             k?.killSwitches?.filter((x: KillSwitchRecord) => x.active) ?? [],
           swarms: s?.runs ?? [],
+          connections: c ?? null,
         });
       } catch {
         /* sidebar can fail silently */
@@ -191,12 +197,20 @@ export default function OpenClawPage() {
       };
     }
 
-    /* default → send natural-language message to the OpenClaw agent */
-    const chatResult = await chatWithAgent(text);
-    if (!chatResult || !chatResult.reply) {
+    /* default → relay to OpenClaw via task decomposer */
+    const taskResult = await executeTask(text);
+    if (!taskResult || !taskResult.reply) {
       return sys(`❌ No response from the agent. Is the gateway online?`);
     }
-    return sys(`${chatResult.reply}\n\n_⏱ ${chatResult.durationMs}ms_`);
+    const stratLabel = taskResult.strategy === "decomposed"
+      ? `🔀 ${taskResult.subtasks.length} subtasks`
+      : "→ direct relay";
+    const subtaskInfo = taskResult.strategy === "decomposed"
+      ? "\n" + taskResult.subtasks.map((s: { label: string; status: string; durationMs?: number }, i: number) =>
+          `${s.status === "completed" ? "✅" : "❌"} _${s.label}_ (${s.durationMs ?? "?"}ms)`
+        ).join("\n")
+      : "";
+    return sys(`${taskResult.reply}\n\n_${stratLabel} · ⏱ ${taskResult.totalDurationMs}ms_${subtaskInfo}`);
   };
 
   const handleSend = async (e: FormEvent) => {
@@ -338,7 +352,7 @@ function Bubble({ msg }: { msg: ChatMessage }) {
 }
 
 function GatewayPill({ gws }: { gws: GatewayRecord[] }) {
-  const ok = gws.filter((g) => g.status === "healthy").length;
+  const ok = gws.filter((g) => g.status === "online" || g.status === "degraded").length;
   if (gws.length === 0)
     return (
       <span style={{ ...pill, background: "rgba(250,204,21,0.12)", color: "#facc15" }}>
@@ -683,6 +697,33 @@ function Sidebar({ data }: { data: SidebarData }) {
         ))}
       </div>
 
+      {/* connections overview */}
+      {data.connections && (
+        <div style={{ padding: "8px 14px", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+          <div style={sectionHead}>Connections</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: "50%",
+              background: data.connections.status.healthy ? "#4ade80" : "#f87171",
+            }} />
+            <span style={{ fontSize: 12, color: "#9ca3af" }}>
+              {data.connections.status.gatewaysOnline}/{data.connections.status.gatewaysTotal} gateways · {data.connections.bindings.length} binding{data.connections.bindings.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          {data.connections.discoveredCapabilities && data.connections.discoveredCapabilities.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+              {data.connections.discoveredCapabilities.slice(0, 12).map((cap: { category: string; name: string }, i: number) => (
+                <span key={i} style={{
+                  fontSize: 10, padding: "2px 7px", borderRadius: 6,
+                  background: cap.category === "tool" ? "rgba(96,165,250,0.12)" : "rgba(250,204,21,0.12)",
+                  color: cap.category === "tool" ? "#60a5fa" : "#facc15",
+                }}>{cap.name}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* quick links */}
       <div
         style={{
@@ -697,6 +738,7 @@ function Sidebar({ data }: { data: SidebarData }) {
         <SBLink href="/openclaw/tools">🛠 Tools</SBLink>
         <SBLink href="/openclaw/policy">📋 Policy</SBLink>
         <SBLink href="/openclaw/audit">📜 Audit</SBLink>
+        <SBLink href="/integrations">🔗 Integrations</SBLink>
       </div>
     </aside>
   );

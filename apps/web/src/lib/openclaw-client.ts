@@ -206,6 +206,89 @@ export async function chatWithAgent(message: string, sessionKey?: string) {
   });
 }
 
+// ── Task Decomposition (primary endpoint — breaks task → concurrent relay → aggregate) ──
+
+export interface TaskSubtask {
+  id: string;
+  type?: "chat" | "tool_invoke" | "info_query";
+  description: string;
+  status: "pending" | "running" | "completed" | "failed" | "retrying";
+  attempts?: number;
+  durationMs: number;
+  error?: string;
+  replyPreview?: string;
+}
+
+export interface TaskResult {
+  reply: string;
+  subtasks: TaskSubtask[];
+  strategy: "single" | "decomposed" | "hybrid";
+  decompositionMethod?: "llm" | "heuristic";
+  synthesisMethod?: "llm" | "concatenation";
+  totalDurationMs: number;
+  completedCount?: number;
+  failedCount?: number;
+}
+
+/**
+ * Send a message through the task decomposer.
+ * The API breaks it into subtasks, fires them concurrently to OpenClaw,
+ * and returns the aggregated response.
+ */
+export async function executeTask(message: string, sessionKey?: string) {
+  return oc<TaskResult>("/task", {
+    method: "POST",
+    body: { message, ...(sessionKey ? { sessionKey } : {}) },
+  });
+}
+
+// ── Connections Overview (all integrations in one call) ──
+
+export interface ConnectionStatus {
+  gatewaysOnline: number;
+  gatewaysTotal: number;
+  workspacesBound: number;
+  killSwitchesActive: number;
+  healthy: boolean;
+}
+
+export interface ConnectionsOverview {
+  gateways: Array<{
+    gatewayId: string;
+    environment: string;
+    host: string;
+    port: number;
+    authMode: string;
+    status: string;
+    basePath: string;
+    loopbackOnly: boolean;
+    createdAt: string;
+  }>;
+  bindings: Array<{
+    bindingId: string;
+    workspaceId: string;
+    gatewayId: string;
+    defaultSessionKey: string;
+  }>;
+  toolCatalog: Array<{
+    toolName: string;
+    riskTier: number;
+    approvalRequired: string;
+    reviewStatus: string;
+  }>;
+  policyRules: number;
+  killSwitchesActive: number;
+  discoveredCapabilities: {
+    capabilities: DiscoveredCapability[];
+    fetchedAt: string;
+  } | null;
+  status: ConnectionStatus;
+}
+
+export async function getConnections() {
+  return oc<ConnectionsOverview>("/connections");
+}
+
 // ── Capability Discovery ──
 
 export interface DiscoveredCapability {

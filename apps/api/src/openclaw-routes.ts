@@ -15,6 +15,19 @@
 import { randomUUID } from "node:crypto";
 
 import { relayChatMessage, type ChatRelayOptions } from "./openclaw-chat-relay.js";
+import { executeDecomposedTask } from "./openclaw-task-decomposer.js";
+import {
+  type OrchestratorEngine,
+  type OrchestratorLlm,
+  type ToolInvokeFunction,
+  type OrchestratorConfig,
+} from "./openclaw-orchestrator.js";
+import { EffectfulOpenClawOrchestrator } from "./openclaw-orchestrator-effect.js";
+import {
+  invokeToolEffect,
+  runOpenClawEffect,
+  selectGatewayEffect,
+} from "./effects/openclaw-effects.js";
 
 // ─── Capability Discovery Cache ────────────────────────────────
 interface DiscoveredCapability {
@@ -67,6 +80,12 @@ export interface OpenClawDependencies {
   middlewareChain: OpenClawMiddlewareChain;
   /** Options for the WebSocket chat relay to the OpenClaw agent. */
   chatRelayOpts?: ChatRelayOptions;
+  /** Orchestrator engine for intelligent task decomposition & execution */
+  orchestrator?: OrchestratorEngine;
+  /** LLM for decomposition and synthesis (injected from server config) */
+  orchestratorLlm?: OrchestratorLlm;
+  /** Orchestrator config overrides */
+  orchestratorConfig?: Partial<OrchestratorConfig>;
 }
 
 // ─── Route Handler ─────────────────────────────────────────────
@@ -256,7 +275,10 @@ export async function handleOpenClawRequest(
       if (optionalString(input, "swarmRunId")) invokeOpts.swarmRunId = optionalString(input, "swarmRunId")!;
       if (optionalString(input, "agentRunId")) invokeOpts.agentRunId = optionalString(input, "agentRunId")!;
       if (optionalBoolean(input, "confirmHighRisk") !== undefined) invokeOpts.confirmHighRisk = optionalBoolean(input, "confirmHighRisk");
-      const result = await deps.middlewareChain.execute(context, invokeRequest, invokeOpts);
+      const result = await runOpenClawEffect(
+        { gatewayRegistry: deps.gatewayRegistry, middlewareChain: deps.middlewareChain },
+        invokeToolEffect(context, invokeRequest, invokeOpts),
+      );
 
       if (result.blocked) {
         return { statusCode: 403, payload: apiError(context.correlationId, "policy_denied", result.reason, { invocationId: result.envelope.invocationId }) };
@@ -296,6 +318,145 @@ export async function handleOpenClawRequest(
         reply: result.reply,
         fragments: result.fragments,
         durationMs: result.durationMs,
+      });
+    }
+
+    // ── Task orchestrator (decompose → concurrent execution → synthesis) ──
+    // Primary endpoint for the frontend. Uses the Orchestrator engine:
+    //   1. LLM-powered decomposition (falls back to heuristics)
+    //   2. Concurrent execution via chat relay + tool invocations
+    //   3. Automatic retry with exponential backoff on failures
+    //   4. LLM-powered synthesis of multi-subtask results
+    if (method === "POST" && subPath === "/task") {
+      const input = parseJson(body);
+      const message = requireString(input, "message");
+      const sessionKey = optionalString(input, "sessionKey");
+
+      let gw;
+      try {
+        gw = await runOpenClawEffect(
+          { gatewayRegistry: deps.gatewayRegistry, middlewareChain: deps.middlewareChain },
+          selectGatewayEffect,
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "No gateways registered — cannot relay task";
+        return { statusCode: 503, payload: apiError(context.correlationId, "unavailable", message) };
+      }
+      const relayOpts: ChatRelayOptions = {
+        host: gw.host,
+        port: gw.port,
+        token: gw.tokenRef,
+        sessionKey: sessionKey ?? "agent:main:main",
+        timeoutMs: 60_000,
+      };
+
+      // Build the tool invoke function that goes through the full middleware chain
+      const toolInvoke: ToolInvokeFunction = async (tool, action, args) => {
+        try {
+          const invokeRequest: import("@ethoxford/contracts").OpenClawInvokeRequest = {
+            tool,
+            ...(action ? { action } : {}),
+            ...(args ? { args } : {}),
+          };
+          const mwResult = await runOpenClawEffect(
+            { gatewayRegistry: deps.gatewayRegistry, middlewareChain: deps.middlewareChain },
+            invokeToolEffect(context, invokeRequest, {}),
+          );
+          return {
+            ok: !mwResult.blocked && !mwResult.requiresApproval,
+            status: mwResult.envelope.status,
+            httpStatus: mwResult.envelope.httpStatus,
+            responseSummary: mwResult.envelope.responseSummary,
+            error: mwResult.blocked ? mwResult.reason : undefined,
+            durationMs: mwResult.envelope.durationMs,
+          };
+        } catch (err) {
+          return {
+            ok: false,
+            status: "failed",
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
+      };
+
+      // Use the orchestrator if available, fall back to the old decomposer
+      const orchestrator = deps.orchestrator ?? new EffectfulOpenClawOrchestrator(
+        deps.orchestratorConfig,
+        deps.orchestratorLlm ?? null,
+      );
+
+      console.log(`[task] Orchestrating to ws://${relayOpts.host}:${relayOpts.port} (LLM=${!!deps.orchestratorLlm})`);
+
+      const result = await orchestrator.execute(message, relayOpts, toolInvoke);
+      return ok(context, {
+        reply: result.aggregatedReply,
+        subtasks: result.subtasks.map((s) => ({
+          id: s.id,
+          type: s.type,
+          description: s.description,
+          status: s.status,
+          attempts: s.attempts,
+          durationMs: s.durationMs,
+          error: s.error,
+          replyPreview: s.replyPreview,
+        })),
+        strategy: result.strategy,
+        decompositionMethod: result.decompositionMethod,
+        synthesisMethod: result.synthesisMethod,
+        totalDurationMs: result.totalDurationMs,
+        completedCount: result.completedCount,
+        failedCount: result.failedCount,
+      });
+    }
+
+    // ── Connections overview (all integrations to OpenClaw) ──
+    // Shows gateways, bindings, capabilities, and system status in one call.
+    if (method === "GET" && subPath === "/connections") {
+      const gateways = deps.gatewayRegistry.list();
+      const bindings = deps.bindingService.list();
+      const tools = deps.toolCatalog.listAll();
+      const policies = deps.policyCompiler.listRules(context.workspaceId);
+      const killSwitches = deps.killSwitch.listActive();
+
+      // Try to get live capabilities from cache (don't block on discovery)
+      const cachedCapabilities = capabilitiesCache
+        ? { capabilities: capabilitiesCache.data, fetchedAt: new Date(capabilitiesCache.fetchedAt).toISOString() }
+        : null;
+
+      return ok(context, {
+        gateways: gateways.map((gw) => ({
+          gatewayId: gw.gatewayId,
+          environment: gw.environment,
+          host: gw.host,
+          port: gw.port,
+          authMode: gw.authMode,
+          status: gw.status,
+          basePath: gw.basePath,
+          loopbackOnly: gw.loopbackOnly,
+          createdAt: gw.createdAt,
+        })),
+        bindings: bindings.map((b) => ({
+          bindingId: b.bindingId,
+          workspaceId: b.workspaceId,
+          gatewayId: b.gatewayId,
+          defaultSessionKey: b.defaultSessionKey,
+        })),
+        toolCatalog: tools.map((t) => ({
+          toolName: t.toolName,
+          riskTier: t.riskTier,
+          approvalRequired: t.approvalRequired,
+          reviewStatus: t.reviewStatus,
+        })),
+        policyRules: policies.length,
+        killSwitchesActive: killSwitches.length,
+        discoveredCapabilities: cachedCapabilities,
+        status: {
+          gatewaysOnline: gateways.filter((g) => g.status === "online" || g.status === "degraded").length,
+          gatewaysTotal: gateways.length,
+          workspacesBound: bindings.length,
+          killSwitchesActive: killSwitches.length,
+          healthy: gateways.length > 0 && gateways.some((g) => g.status === "online") && killSwitches.length === 0,
+        },
       });
     }
 

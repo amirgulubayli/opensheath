@@ -85,6 +85,11 @@ import {
 } from "./openclaw-routes.js";
 import { HttpToolsInvokeClient } from "./openclaw-client.js";
 import {
+  OpenClawOrchestrator,
+  OpenAiOrchestratorLlm,
+} from "./openclaw-orchestrator.js";
+import OpenAI from "openai";
+import {
   OpenClawGatewayRegistry,
   OpenClawWorkspaceBindingService,
   OpenClawToolCatalog,
@@ -679,6 +684,37 @@ function createOpenClawDependencies(): OpenClawDependencies {
   );
   // ── End seed ───────────────────────────────────────────────────
 
+  // ── Orchestrator with LLM-powered decomposition & synthesis ────
+  const openAiKey = process.env.OPENAI_API_KEY;
+  const openAiModel = process.env.OPENAI_MODEL?.trim();
+  let orchestratorLlm: import("./openclaw-orchestrator.js").OrchestratorLlm | undefined;
+  if (openAiKey) {
+    try {
+      const { default: OpenAI } = await import("openai");
+      const client = new OpenAI({ apiKey: openAiKey });
+      orchestratorLlm = new OpenAiOrchestratorLlm(client, openAiModel);
+      console.log(`[openclaw] Orchestrator LLM enabled (model=${openAiModel ?? "gpt-4.1-mini"})`);
+    } catch (err) {
+      console.warn(`[openclaw] Failed to init orchestrator LLM:`, err);
+    }
+  } else {
+    console.log(`[openclaw] Orchestrator LLM disabled (no OPENAI_API_KEY)`);
+  }
+
+  const orchestrator = new OpenClawOrchestrator(
+    {
+      maxConcurrency: 5,
+      maxRetries: 2,
+      retryBaseDelayMs: 1000,
+      totalTimeoutMs: 120_000,
+      subtaskTimeoutMs: 60_000,
+      useLlmDecomposition: !!orchestratorLlm,
+      useLlmSynthesis: !!orchestratorLlm,
+    },
+    orchestratorLlm ?? null,
+  );
+  // ── End orchestrator ───────────────────────────────────────────
+
   return {
     gatewayRegistry,
     bindingService,
@@ -689,6 +725,8 @@ function createOpenClawDependencies(): OpenClawDependencies {
     invocationStore,
     swarmOrchestrator,
     middlewareChain,
+    orchestrator,
+    orchestratorLlm,
   };
 }
 

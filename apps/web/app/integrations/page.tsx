@@ -8,7 +8,7 @@ import {
   revokeConnector,
   recordConnectorHealth,
 } from "../../src/lib/api-client";
-import { listGateways, discoverCapabilities, type GatewayRecord, type DiscoveredCapability } from "../../src/lib/openclaw-client";
+import { listGateways, discoverCapabilities, getConnections, type GatewayRecord, type DiscoveredCapability, type ConnectionsOverview } from "../../src/lib/openclaw-client";
 import { getSession } from "../../src/lib/session";
 import {
   mapConnectorsToDashboard,
@@ -133,6 +133,7 @@ export default function IntegrationsPage() {
   const [capabilities, setCapabilities] = useState<DiscoveredCapability[]>([]);
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(true);
   const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null);
+  const [connections, setConnections] = useState<ConnectionsOverview | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
@@ -188,6 +189,7 @@ export default function IntegrationsPage() {
     void refreshConnectors();
     void refreshGateways();
     void refreshCapabilities();
+    void getConnections().then((c) => setConnections(c)).catch(() => {});
   }, [refreshConnectors, refreshGateways, refreshCapabilities]);
 
   // Auto-fetch on mount + poll every 30s
@@ -362,14 +364,28 @@ export default function IntegrationsPage() {
           <span className="stat-label">Revoked</span>
         </div>
         <div className="stat-card">
-          <span className="stat-value">{gateways.length}</span>
-          <span className="stat-label">Gateways</span>
+          <span className="stat-value" style={{ color: connections?.status?.healthy ? "#22c55e" : "#f59e0b" }}>
+            {connections?.status?.gatewaysOnline ?? gateways.length}/{connections?.status?.gatewaysTotal ?? gateways.length}
+          </span>
+          <span className="stat-label">Gateways Online</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-value" style={{ color: "#60a5fa" }}>
+            {connections?.bindings?.length ?? 0}
+          </span>
+          <span className="stat-label">Bindings</span>
         </div>
         <div className="stat-card">
           <span className="stat-value" style={{ color: "#8b5cf6" }}>
             {capabilities.length}
           </span>
           <span className="stat-label">Discovered</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-value" style={{ color: connections?.killSwitchesActive ? "#ef4444" : "#22c55e" }}>
+            {connections?.killSwitchesActive ?? 0}
+          </span>
+          <span className="stat-label">Kill Switches</span>
         </div>
       </div>
 
